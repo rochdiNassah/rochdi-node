@@ -1,5 +1,5 @@
 {
-  "name": "node-http2client",
+  "name": "rochdi-http2client",
   "version": "1.0.1",
   "description": "NodeJS HTTP2 Client",
   "main": "./src/index.js",
