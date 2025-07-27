@@ -1,10 +1,10 @@
 {
-  "name": "http2-client",
+  "name": "node-http2client",
   "version": "1.0.0",
   "description": "NodeJS HTTP2 Client",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jasmine --config=test-config.json"
   },
   "repository": {
     "type": "git",
@@ -15,5 +15,8 @@
   "bugs": {
     "url": "https://github.com/rochdiNassah/http2-client/issues"
   },
-  "homepage": "https://github.com/rochdiNassah/http2-client#readme"
+  "homepage": "https://github.com/rochdiNassah/http2-client#readme",
+  "devDependencies": {
+    "jasmine": "^5.9.0"
+  }
 }
