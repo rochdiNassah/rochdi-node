@@ -4,12 +4,19 @@ const log = console.log.bind(console);
 
 const Http2Client = require('./src');
 
-const httpClient = new Http2Client(true, 4e3);
+function X(o) {
+  return new Http2Client({ ...o, userAgent: 'mozilla' });
+}
 
-const session = httpClient.createSession('https://google.com');
+const httpClient = new X({ retryOnError: true });
 
-setInterval(() => {
-  httpClient.get('https://google.com', { session }).then(res => {
-    console.log(res.statusCode);
-  });
-}, 4e3);
+const cb = () => {
+  for (let i = 0; 1 > i; ++i) {
+    httpClient.get('https://google.com', { headers: { 'foo': 1, 'User-Agent': '', 'bar': 2 } }).then(res => log(res.statusCode));
+  }
+
+  // setTimeout(httpClient.destroy.bind(httpClient), 4e3);
+};
+
+// cb();
+// setInterval(cb, 1e3);

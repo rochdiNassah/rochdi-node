@@ -12,11 +12,15 @@ const { rand } = helpers;
 const log = console.log.bind(console);
 
 class Http2Client extends EventEmitter {
-  constructor(retryOnError = true, reqTimeout = 32e3) {
+  constructor(opts = {}) {
     super();
 
-    this.reqTimeout = reqTimeout;
-    this.retryOnError = retryOnError;
+    const { timeout, retryOnError, userAgent } = opts;
+
+    this.timeout = timeout ?? 4e3;
+    this.retryOnError = retryOnError ?? true;
+    this.userAgent = userAgent;
+
     this.sessions = new Map();
     this.sessionCounter = 0;
   }
@@ -55,13 +59,27 @@ class Http2Client extends EventEmitter {
     for (const session of sessions.values()) {
       session.destroy();
     }
+    sessions.clear();
   }
 
   _request(method, urlString, opts = {}) {
-    return new Promise(resolve => {
+    return new Promise(async resolve => {
       const { headers, body, cipher } = opts;
       const { protocol, path, host } = urlParser(urlString);
       const { sessions } = this;
+
+      if (this.userAgent && headers) {
+        const keys = ['user-agent', 'User-Agent'];
+        for (let i = 0, key; keys.length > i; ++i) {
+          key = keys[i]
+          if (headers.hasOwnProperty(key)) {
+            if (!headers[key].length) {
+              headers[key] = this.userAgent;
+            }
+            break;
+          }
+        }
+      }
 
       const options = {
         ':scheme': 'https',
@@ -69,7 +87,7 @@ class Http2Client extends EventEmitter {
         ':path': path,
         ...headers
       };
-  
+        
       const url = protocol+'//'+host;
 
       let session = opts.session;
@@ -80,6 +98,7 @@ class Http2Client extends EventEmitter {
           const expireCb = () => sessions.delete(url);
           session = http2.connect(url).once('error', expireCb).once('close', expireCb);
           sessions.set(url, session);
+          await new Promise(r => session.once('connect', r));
           log('CREATE HTTP2 SESSION (AUTO)');
         }
       }
@@ -88,7 +107,7 @@ class Http2Client extends EventEmitter {
         .once('error', onerror.bind(this, [method, urlString, opts], resolve))
         .once('response', headers => onresponse(headers, req, resolve));
 
-      req.setTimeout(this.reqTimeout, onerror.bind(this, [method, urlString, opts], resolve));
+      req.setTimeout(this.timeout, onerror.bind(this, [method, urlString, opts], resolve));
 
       body && req.write(body);
       req.end();
