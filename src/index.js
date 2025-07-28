@@ -71,7 +71,7 @@ class Http2Client extends EventEmitter {
       if (this.userAgent && headers) {
         const keys = ['user-agent', 'User-Agent'];
         for (let i = 0, key; keys.length > i; ++i) {
-          key = keys[i]
+          key = keys[i];
           if (headers.hasOwnProperty(key)) {
             if (!headers[key].length) {
               headers[key] = this.userAgent;
@@ -93,7 +93,7 @@ class Http2Client extends EventEmitter {
       let session = opts.session;
       if (!session) {
         session = sessions.get(url);
-        if (!session) {
+        if (!session || session.destroyed) {
           if (cipher) tls.DEFAULT_CIPHERS = cipher;
           const expireCb = () => sessions.delete(url);
           session = http2.connect(url).once('error', expireCb).once('close', expireCb);
