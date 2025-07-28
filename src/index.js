@@ -38,20 +38,24 @@ class Http2Client extends EventEmitter {
   }
 
   createSession(url, cipher) {
-    const { sessions } = this;
+    return new Promise(r => {
+      const { sessions } = this;
 
-    const key = this.sessionCounter++;
+      const key = this.sessionCounter++;
 
-    if (cipher) tls.DEFAULT_CIPHERS = cipher;
+      if (cipher) tls.DEFAULT_CIPHERS = cipher;
 
-    const expireCb = () => sessions.delete(key);
+      log('Creating HTTP2 session...');
 
-    const session = http2.connect(url).once('error', expireCb).once('close', expireCb);
-    sessions.set(key, session);
+      const expireCb = () => sessions.delete(key);
+      const session = http2.connect(url).once('error', expireCb).once('close', expireCb);
+      sessions.set(key, session);
 
-    log('CREATE HTTP2 SESSION (MANUAL)');
-
-    return session;
+      session.once('connect', () => {
+        log('CREATE HTTP2 SESSION (MANUAL)');
+        r(session);
+      });
+    });
   }
 
   destroy() {
@@ -98,10 +102,13 @@ class Http2Client extends EventEmitter {
           const expireCb = () => sessions.delete(url);
           session = http2.connect(url).once('error', expireCb).once('close', expireCb);
           sessions.set(url, session);
+          log(session);
           await new Promise(r => session.once('connect', r));
           log('CREATE HTTP2 SESSION (AUTO)');
         }
       }
+
+      return log(session);
 
       let req = session.request(options)
         .once('error', onerror.bind(this, [method, urlString, opts], resolve))

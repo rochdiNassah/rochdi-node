@@ -10,6 +10,8 @@ function X(o) {
 
 const httpClient = new X({ retryOnError: false });
 
+httpClient.get('https://dgoogle.com').then(log);
+
 // const cb = () => {
 //   for (let i = 0; 118 > i; ++i) {
 //     httpClient.get('https://google.com').then(res => log(res.statusCode));
