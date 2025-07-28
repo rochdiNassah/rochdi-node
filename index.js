@@ -10,7 +10,7 @@ function X(o) {
 
 const httpClient = new X({ retryOnError: false });
 
-httpClient.get('https://dgoogle.com').then(log);
+httpClient.get('http://127.1:8000').then(log);
 
 // const cb = () => {
 //   for (let i = 0; 118 > i; ++i) {

@@ -100,7 +100,13 @@ class Http2Client extends EventEmitter {
         if (!session || session.destroyed) {
           if (cipher) tls.DEFAULT_CIPHERS = cipher;
           const expireCb = () => sessions.delete(url);
-          session = http2.connect(url).once('error', expireCb).once('close', expireCb);
+          session = http2.connect(url).once('error', () => {
+            log('session error');
+            expireCb();
+          }).once('close', () => {
+            log('session close');
+            expireCb();
+          });
           sessions.set(url, session);
           log(session);
           await new Promise(r => session.once('connect', r));
