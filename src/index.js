@@ -37,25 +37,20 @@ class Http2Client extends EventEmitter {
     return this._request('OPTIONS', ...args);
   }
 
-  createSession(url, cipher) {
-    return new Promise(r => {
-      const { sessions } = this;
+  createSession(url, cipher, key) {
+    const { sessions } = this;
 
-      const key = this.sessionCounter++;
+    // log('Creating HTTP2 session...');
 
-      if (cipher) tls.DEFAULT_CIPHERS = cipher;
+    if (void 0 === key) key = this.sessionCounter++;
+    if (cipher) tls.DEFAULT_CIPHERS = cipher;
+    
+    const expireCb = () => sessions.delete(key);
+    const session = http2.connect(url).once('error', expireCb).once('close', expireCb);
+    sessions.set(key, session);
 
-      log('Creating HTTP2 session...');
-
-      const expireCb = () => sessions.delete(key);
-      const session = http2.connect(url).once('error', expireCb).once('close', expireCb);
-      sessions.set(key, session);
-
-      session.once('connect', () => {
-        log('CREATE HTTP2 SESSION (MANUAL)');
-        r(session);
-      });
-    });
+    log('CREATE HTTP2 SESSION (%s)', 'string' === typeof key ? 'AUTO' : 'MANUAL');
+    return key;
   }
 
   destroy() {
@@ -94,28 +89,15 @@ class Http2Client extends EventEmitter {
         
       const url = protocol+'//'+host;
 
-      let session = opts.session;
-      if (!session) {
-        session = sessions.get(url);
-        if (!session || session.destroyed) {
-          if (cipher) tls.DEFAULT_CIPHERS = cipher;
-          const expireCb = () => sessions.delete(url);
-          session = http2.connect(url).once('error', () => {
-            log('session error');
-            expireCb();
-          }).once('close', () => {
-            log('session close');
-            expireCb();
-          });
-          sessions.set(url, session);
-          log(session);
-          await new Promise(r => session.once('connect', r));
-          log('CREATE HTTP2 SESSION (AUTO)');
-        }
+      let sessionKey = opts.session, session;
+
+      if (void 0 !== sessionKey) {
+        session = sessions.get(sessionKey);
+        if (!session || session.destroyed) session = sessions.get(this.createSession(url, cipher, sessionKey));
+      } else {
+        session = sessions.get(url) ?? sessions.get(this.createSession(url, cipher, url));
       }
-
-      return log(session);
-
+      
       let req = session.request(options)
         .once('error', onerror.bind(this, [method, urlString, opts], resolve))
         .once('response', headers => onresponse(headers, req, resolve));
