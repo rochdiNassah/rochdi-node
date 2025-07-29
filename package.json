@@ -3,6 +3,7 @@
   "version": "1.0.9",
   "description": "NodeJS HTTP2 Client",
   "main": "./src/index.js",
+  "keywords": ["http2", "node http2 client", "http2 client"],
   "scripts": {
     "test": "jasmine --config=test-config.json"
   },
