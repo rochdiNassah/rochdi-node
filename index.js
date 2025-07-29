@@ -10,22 +10,18 @@ function X(o) {
 
 const httpClient = new X({ retryOnError: true });
 
-const sessions = [];
+const session = httpClient.createSession('https://google.com');
 
-for (let i = 0; 4 > i; ++i) {
-  sessions.push(httpClient.createSession('https://google.com'));
-}
-
-sessions.forEach(session => {
-  httpClient.get('https://google.com', { session }).then(res => log(res.statusCode));
-});
-
+let r = 0;
 const cb = () => {
-  for (let i = 0; 32 > i; ++i) {
-    httpClient.get('https://google.com', { session }).then(res => log(res.statusCode));
+  const p = [];
+  for (let i = 0; 64 > i; ++i) {
+    p.push(httpClient.get('https://google.com', { session }).then(res => log(res.statusCode)));
   }
-  // setTimeout(httpClient.destroy.bind(httpClient), 4e3);
+  Promise.all(p).then(() => {
+    log('iteration#%d done', ++r);
+    setTimeout(cb, 4e3);
+  });
 };
 
-// cb();
-// setInterval(cb, 1e3);
+cb();
