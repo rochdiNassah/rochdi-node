@@ -19,7 +19,7 @@ async function example() { // Manual session
 function example2() { // Auto session
   const p = [];
   for (let i = 0; 4 > i; ++i)
-  p.push(httpClient.get(url, { headers: { Foo: 1, bar: 2 } }).then(res => log(res.statusCode)));
+  p.push(httpClient.post(url, { headers: { Foo: 1, bar: 2 } }).then(res => log(res.statusCode)));
   return Promise.all(p);
 }
 
