@@ -33,7 +33,7 @@ class Http2Client extends EventEmitter {
     return this._request('POST', ...args);
   }
 
-  post(...args) {
+  delete(...args) {
     return this._request('DELETE', ...args);
   }
 
