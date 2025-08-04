@@ -37,6 +37,10 @@ class Http2Client extends EventEmitter {
     return this._request('DELETE', ...args);
   }
 
+  patch(...args) {
+    return this._request('PATCH', ...args);
+  }
+
   options(...args) {
     return this._request('OPTIONS', ...args);
   }
