@@ -71,9 +71,11 @@ class Http2Client extends EventEmitter {
 
   _request(method, urlString, opts = {}) {
     return new Promise(async resolve => {
-      const { headers, body, cipher } = opts;
+      const { body, cipher } = opts;
       const { protocol, path, host } = urlParser(urlString);
       const { sessions } = this;
+
+      const headers = structuredClone(opts.headers);
 
       if (this.userAgent && headers) {
         const keys = ['user-agent', 'User-Agent'];
