@@ -41,6 +41,10 @@ class Http2Client extends EventEmitter {
     return this._request('PATCH', ...args);
   }
 
+  put(...args) {
+    return this._request('PUT', ...args);
+  }
+
   options(...args) {
     return this._request('OPTIONS', ...args);
   }
