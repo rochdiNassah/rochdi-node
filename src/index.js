@@ -118,7 +118,7 @@ class Http2Client extends EventEmitter {
 
       req.setTimeout(this.timeout, onerror.bind(this, [method, urlString, opts], resolve));
 
-      body && req.write(body);
+      if (body) req.write('object' === typeof body ? JSON.stringify(body) : body);
       req.end();
     });
   }
