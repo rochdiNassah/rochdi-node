@@ -7,7 +7,7 @@ const urlParser = require('node:url').parse;
 const helpers = require('./helpers');
 const tls = require('node:tls');
 
-const { rand } = helpers;
+const { rand, padString } = helpers;
 
 const log = console.log.bind(console);
 
@@ -52,6 +52,8 @@ class Http2Client extends EventEmitter {
   createSession(url, cipher, key) {
     const { sessions } = this;
 
+    url = padString(url, 'https://', void 0, false);
+
     // log('Creating HTTP2 session...');
 
     if (void 0 === key) key = this.sessionCounter++;
@@ -76,7 +78,7 @@ class Http2Client extends EventEmitter {
   _request(method, urlString, opts = {}) {
     return new Promise(async resolve => {
       const { body, cipher } = opts;
-      const { protocol, path, host } = urlParser(urlString);
+      const { protocol, path, host } = urlParser(padString(urlString, 'https://', void 0, false));
       const { sessions } = this;
 
       const headers = structuredClone(opts.headers);
