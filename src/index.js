@@ -100,19 +100,20 @@ class Http2Client extends EventEmitter {
     const options = { ':scheme': 'https', ':method': method, ':path': path, ...headers };
     const url = protocol+'//'+host;
 
-    let sessionKey = opts.session, session, resolve;
+    let sessionKey = opts.session, session;
 
     if (void 0 !== sessionKey) {
       session = sessions.get(sessionKey);
       if (!session || session.destroyed) session = sessions.get(this.createSession(url, cipher, sessionKey));
     } else session = sessions.get(url) ?? sessions.get(this.createSession(url, cipher, url));
     
-    const promise = new Promise(r => resolve = r);
+    let pp = {}, promise = new Promise((resolve, reject) => pp = { resolve, reject });
+    
     const req = session.request(options)
-      .once('error', onerror.bind(this, [method, urlString, opts], resolve))
-      .once('response', headers => onresponse(headers, req, resolve));
+      .once('error', onerror.bind(this, arguments, pp))
+      .once('response', headers => onresponse(headers, req, pp));
 
-    req.setTimeout(this.timeout, onerror.bind(this, [method, urlString, opts], resolve));
+    req.setTimeout(this.timeout, onerror.bind(this, arguments, pp));
 
     if (body) req.write('object' === typeof body ? JSON.stringify(body) : body);
     req.end();
@@ -121,13 +122,13 @@ class Http2Client extends EventEmitter {
   }
 }
 
-function onerror(args, resolve) {
-  if (!this.retryOnError) return log('requestError'), resolve({ statusCode: -1 });
+function onerror(args, promise) {
+  if (!this.retryOnError) return log('requestError'), promise.reject();
   log('Request error | %s', 'Retrying...');
-  setTimeout(() => resolve(this._request(...args)), rand(1e3, 3e3));
+  setTimeout(() => promise.resolve(this._request(...args)), rand(1e3, 3e3));
 }
 
-function onresponse(headers, req, resolve) {
+function onresponse(headers, req, promise) {
   const contentEncoding = headers['content-encoding'], buff = [];
 
   if ('gzip' === contentEncoding) req = req.pipe(zlib.createGunzip());
@@ -140,7 +141,7 @@ function onresponse(headers, req, resolve) {
       data = JSON.parse(data)
     } catch (e) {};
 
-    resolve({ statusCode: headers[':status'], headers, data });
+    promise.resolve({ statusCode: headers[':status'], headers, data });
   });
 }
 
