@@ -1,5 +1,7 @@
 'use strict';
 
+global.exit = (...data) => (console.log(...data), process.exit());
+
 exports.rand = (min, max) => {
   return Math.round(min+(Math.random()*(max-min)));
 };

@@ -4,7 +4,7 @@ const log = console.log.bind(console);
 const http2 = require('node:http2');
 
 const server = http2.createServer(res => {
-  log(1)
+  log(1);
 });
 
 server.once('error', err => log('server error', err));
@@ -16,5 +16,4 @@ server.on('stream', (s, h) => {
 });
 
 server.on('connect', log);
-
 server.listen(8000);

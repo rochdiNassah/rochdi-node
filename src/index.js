@@ -1,5 +1,6 @@
 'use strict';
 
+const log = console.log.bind(console);
 const EventEmitter = require('node:events');
 const http2 = require('node:http2');
 const zlib = require('node:zlib');
@@ -9,7 +10,7 @@ const tls = require('node:tls');
 
 const { rand, padString } = helpers;
 
-const log = console.log.bind(console);
+const DEFAULT_CIPHERS = tls.DEFAULT_CIPHERS;
 
 class Http2Client extends EventEmitter {
   constructor(opts = {}) {
@@ -54,13 +55,14 @@ class Http2Client extends EventEmitter {
 
     url = padString(url, 'https://', void 0, false);
 
-    // log('Creating HTTP2 session...');
-
     if (void 0 === key) key = this.sessionCounter++;
     if (cipher) tls.DEFAULT_CIPHERS = cipher;
     
     const expireCb = () => sessions.delete(key);
     const session = http2.connect(url).once('error', expireCb).once('close', expireCb);
+    
+    tls.DEFAULT_CIPHERS = DEFAULT_CIPHERS;
+
     sessions.set(key, session);
 
     log('CREATE HTTP2 SESSION (%s)', 'string' === typeof key ? 'AUTO' : 'MANUAL');
@@ -76,74 +78,69 @@ class Http2Client extends EventEmitter {
   }
 
   _request(method, urlString, opts = {}) {
-    return new Promise(async resolve => {
-      const { body, cipher } = opts;
-      const { protocol, path, host } = urlParser(padString(urlString, 'https://', void 0, false));
-      const { sessions } = this;
+    urlString = padString(urlString, 'https://', void 0, false);
 
-      const headers = structuredClone(opts.headers);
+    const { body, cipher } = opts;
+    const { protocol, path, host } = urlParser(urlString);
+    const { sessions, userAgent } = this;
 
-      if (this.userAgent && headers) {
-        const keys = ['user-agent', 'User-Agent'];
-        for (let i = 0, key; keys.length > i; ++i) {
-          key = keys[i];
-          if (headers.hasOwnProperty(key)) {
-            if (!headers[key].length) {
-              headers[key] = this.userAgent;
-            }
-            break;
-          }
+    const headers = { ...opts.headers };
+
+    if (userAgent && headers) {
+      const keys = ['user-agent', 'User-Agent'];
+      for (let i = 0, key; keys.length > i; ++i) {
+        key = keys[i];
+        if (headers.hasOwnProperty(key)) {
+          if (!headers[key].length) headers[key] = userAgent;
+          break;
         }
       }
+    }
 
-      const options = {
-        ':scheme': 'https',
-        ':method': method,
-        ':path': path,
-        ...headers
-      };
-        
-      const url = protocol+'//'+host;
+    const options = { ':scheme': 'https', ':method': method, ':path': path, ...headers };
+    const url = protocol+'//'+host;
 
-      let sessionKey = opts.session, session;
+    let sessionKey = opts.session, session, resolve;
 
-      if (void 0 !== sessionKey) {
-        session = sessions.get(sessionKey);
-        if (!session || session.destroyed) session = sessions.get(this.createSession(url, cipher, sessionKey));
-      } else {
-        session = sessions.get(url) ?? sessions.get(this.createSession(url, cipher, url));
-      }
-      
-      let req = session.request(options)
-        .once('error', onerror.bind(this, [method, urlString, opts], resolve))
-        .once('response', headers => onresponse(headers, req, resolve));
+    if (void 0 !== sessionKey) {
+      session = sessions.get(sessionKey);
+      if (!session || session.destroyed) session = sessions.get(this.createSession(url, cipher, sessionKey));
+    } else session = sessions.get(url) ?? sessions.get(this.createSession(url, cipher, url));
+    
+    const promise = new Promise(r => resolve = r);
+    const req = session.request(options)
+      .once('error', onerror.bind(this, [method, urlString, opts], resolve))
+      .once('response', headers => onresponse(headers, req, resolve));
 
-      req.setTimeout(this.timeout, onerror.bind(this, [method, urlString, opts], resolve));
+    req.setTimeout(this.timeout, onerror.bind(this, [method, urlString, opts], resolve));
 
-      if (body) req.write('object' === typeof body ? JSON.stringify(body) : body);
-      req.end();
-    });
+    if (body) req.write('object' === typeof body ? JSON.stringify(body) : body);
+    req.end();
+
+    return promise;
   }
 }
 
 function onerror(args, resolve) {
-  if (!this.retryOnError) return (log('Request error'), resolve({ statusCode: -1 }));
+  if (!this.retryOnError) return log('requestError'), resolve({ statusCode: -1 });
   log('Request error | %s', 'Retrying...');
-  setTimeout(() => resolve(this._request(...args)), rand(1e3, 5e3));
+  setTimeout(() => resolve(this._request(...args)), rand(1e3, 3e3));
 }
 
 function onresponse(headers, req, resolve) {
-  const res = { statusCode: headers[':status'], headers }, dataBuff = [];
+  const contentEncoding = headers['content-encoding'], buff = [];
 
-  if ('gzip' === headers['content-encoding']) req = req.pipe(zlib.createGunzip());
+  if ('gzip' === contentEncoding) req = req.pipe(zlib.createGunzip());
 
-  req.on('data', dataBuff.push.bind(dataBuff));
+  req.on('data', buff.push.bind(buff));
   req.once('end', () => {
-    res.data = Buffer.concat(dataBuff).toString();
+    let data = String(Buffer.concat(buff));
+
     try {
-      res.data = JSON.parse(res.data);
-    } catch (e) {}
-    resolve(res);
+      data = JSON.parse(data)
+    } catch (e) {};
+
+    resolve({ statusCode: headers[':status'], headers, data });
   });
 }
 
