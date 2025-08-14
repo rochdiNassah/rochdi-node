@@ -1,6 +1,6 @@
 {
   "name": "rochdi-http2client",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "NodeJS HTTP2 Client",
   "main": "./src/index.js",
   "keywords": [
