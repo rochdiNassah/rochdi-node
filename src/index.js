@@ -7,16 +7,16 @@ const urlParser = require('node:url').parse;
 const helpers = require('./helpers');
 const tls = require('node:tls');
 
-const { rand, padString } = helpers;
+const { formatDuration, rand, padString } = helpers;
 
+const NOOP = Function.prototype;
 const DEFAULT_CIPHERS = tls.DEFAULT_CIPHERS;
 
 module.exports = Http2Client;
 
 function Http2Client(opts) {
-  const { timeout, retryOnError, userAgent } = opts;
+  const { retryOnError, userAgent } = opts;
 
-  this.timeout = timeout ?? 4e3;
   this.retryOnError = retryOnError ?? true;
   this.userAgent = userAgent;
 
@@ -24,43 +24,43 @@ function Http2Client(opts) {
   this.sessionCounter = 0;
 }
 
-['GET', 'POST', 'OPTIONS', 'PUT', 'PATCH', 'DELETE'].forEach(method => {
+['GET', 'POST', 'OPTIONS', 'PUT', 'PATCH', 'DELETE', 'HEAD'].forEach(method => {
   Http2Client.prototype[method.toLowerCase()] = function () {
     return this._request(method, ...arguments);
   };
 });
 
-Http2Client.prototype.createSession = function (url, cipher, key) {
-  const { sessions } = this;
-
-  url = padString(url, 'https://', void 0, false);
-
-  if (void 0 === key) key = this.sessionCounter++;
-  if (cipher) tls.DEFAULT_CIPHERS = cipher;
-  
-  const expireCb = () => sessions.delete(key);
-  const session = http2.connect(url).once('error', expireCb).once('close', expireCb);
-  
-  tls.DEFAULT_CIPHERS = DEFAULT_CIPHERS;
-
-  sessions.set(key, session);
-
-  log('CREATE HTTP2 SESSION (%s)', 'string' === typeof key ? 'AUTO' : 'MANUAL');
-  return key;
-};
-
 Http2Client.prototype.destroy = function () {
   const { sessions } = this;
-  for (const session of sessions.values()) {
-    session.destroy();
-  }
+  for (const session of sessions.values()) session.destroy();
   sessions.clear();
+};
+
+Http2Client.prototype.createSession = function (url, cipher, key) {
+  return new Promise((resolve, reject) => {
+    const { sessions } = this;
+
+    url = padString(url, 'https://', void 0, false);
+  
+    if (void 0 === key) key = this.sessionCounter++;
+  
+    if (cipher) tls.DEFAULT_CIPHERS = cipher;
+
+    const session = http2.connect(url, resolve.bind(void 0, key));
+    session.rejectionCallbacks = [reject];
+    session.once('error', () => (log('session error'), session.rejectionCallbacks.forEach(cb => cb())));
+
+    tls.DEFAULT_CIPHERS = DEFAULT_CIPHERS;
+
+    sessions.set(key, session);
+    log('session created (%s)', 'string' === typeof key ? 'auto' : 'manual');
+  });
 };
 
 Http2Client.prototype._request = async function (method, urlString, opts) {
   urlString = padString(urlString, 'https://', void 0, false);
 
-  const { body, cipher } = opts;
+  const { body, cipher, sessionKey } = opts;
   const { protocol, path, host } = urlParser(urlString);
   const { sessions, userAgent } = this;
 
@@ -80,33 +80,28 @@ Http2Client.prototype._request = async function (method, urlString, opts) {
   const options = { ':scheme': 'https', ':method': method, ':path': path, ...headers };
   const url = protocol+'//'+host;
 
-  let sessionKey = opts.session, session;
+  let session, pp = {}, promise = new Promise((resolve, reject) => pp = { resolve, reject });
 
   if (void 0 !== sessionKey) {
     session = sessions.get(sessionKey);
-    if (!session || session.destroyed) session = sessions.get(this.createSession(url, cipher, sessionKey));
-  } else session = sessions.get(url) ?? sessions.get(this.createSession(url, cipher, url));
+    if (!session || session.destroyed) session = sessions.get(await this.createSession(url, cipher, sessionKey));
+  } else session = sessions.get(url) ?? sessions.get(await this.createSession(url, cipher, url));
 
-  await new Promise(r => session.once('connect', r));
-  
-  let pp = {}, promise = new Promise((resolve, reject) => pp = { resolve, reject });
-  
-  const req = session.request(options)
-    .once('error', onerror.bind(this, arguments, pp))
-    .once('response', headers => onresponse(headers, req, pp));
+  session.rejectionCallbacks.push(promise.reject);
 
-  req.setTimeout(this.timeout, onerror.bind(this, arguments, pp));
+  const req = session.request(options).once('error', onerror.bind(this, arguments, pp)).once('response', headers => onresponse(headers, req, pp));
 
   if (body) req.write('object' === typeof body ? JSON.stringify(body) : body);
-  req.end();
 
-  return promise;
+  return req.end(), promise;
 };
 
-function onerror(args, promise) {
+function onerror(args, promise, err) {
   if (!this.retryOnError) return log('request error'), promise.reject();
-  log('request error | %s', 'Retrying...');
-  setTimeout(() => promise.resolve(this._request(...args)), rand(1e3, 3e3));
+
+  const retryTimeout = rand(1e3, 4e3);
+  setTimeout(() => promise.resolve(this._request(...args)), retryTimeout);
+  log('request error, retrying in %s...', formatDuration(retryTimeout));
 }
 
 function onresponse(headers, req, promise) {

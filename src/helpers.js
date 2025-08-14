@@ -2,6 +2,33 @@
 
 global.exit = (...data) => (console.log(...data), process.exit());
 
+exports.formatDuration = function (ms) {
+  const types = [
+    [31104e6, ' year(s)'],
+    [2592e6, ' month(s)'],
+    [864e5, ' day(s)'],
+    [36e5, ' hour(s)'],
+    [6e4, ' minute(s)'],
+    [1e3, ' second(s)'],
+    [1, 'ms']
+  ];
+
+  const r = [];
+  for (let i = 0, t, v; i < types.length; i++) {
+    t = types[i];
+    v = Math.floor(ms/t[0]);
+    if (v) {
+      ms -= t[0]*v;
+      r.push(v+t[1]);
+      if (1 < r.length) {
+        break;
+      }
+    }  
+  }
+
+  return r.join(', ');
+};
+
 exports.rand = (min, max) => {
   return Math.round(min+(Math.random()*(max-min)));
 };
