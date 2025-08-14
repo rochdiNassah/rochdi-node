@@ -85,7 +85,7 @@ Http2Client.prototype._request = async function (method, urlString, opts) {
   if (void 0 !== sessionKey) {
     session = sessions.get(sessionKey);
     if (!session || session.destroyed) session = sessions.get(await this.createSession(url, cipher, sessionKey));
-  } else session = sessions.get(url) ?? sessions.get(await this.createSession(url, cipher, url));
+  } else session = sessions.get(url) ?? sessions.get(await this.createSession(url, cipher, urlString));
 
   session.rejectionCallbacks.push(promise.reject);
 
