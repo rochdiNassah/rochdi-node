@@ -57,7 +57,7 @@ Http2Client.prototype.destroy = function () {
   sessions.clear();
 };
 
-Http2Client.prototype._request = function (method, urlString, opts) {
+Http2Client.prototype._request = async function (method, urlString, opts) {
   urlString = padString(urlString, 'https://', void 0, false);
 
   const { body, cipher } = opts;
@@ -86,6 +86,8 @@ Http2Client.prototype._request = function (method, urlString, opts) {
     session = sessions.get(sessionKey);
     if (!session || session.destroyed) session = sessions.get(this.createSession(url, cipher, sessionKey));
   } else session = sessions.get(url) ?? sessions.get(this.createSession(url, cipher, url));
+
+  await new Promise(r => session.once('connect', r));
   
   let pp = {}, promise = new Promise((resolve, reject) => pp = { resolve, reject });
   
