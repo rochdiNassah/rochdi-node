@@ -9,7 +9,6 @@ const tls = require('node:tls');
 
 const { formatDuration, rand, padString } = helpers;
 
-const NOOP = Function.prototype;
 const DEFAULT_CIPHERS = tls.DEFAULT_CIPHERS;
 
 module.exports = Http2Client;
@@ -85,7 +84,7 @@ Http2Client.prototype._request = async function (method, urlString, opts) {
   if (void 0 !== sessionKey) {
     session = sessions.get(sessionKey);
     if (!session || session.destroyed) session = sessions.get(await this.createSession(url, cipher, sessionKey));
-  } else session = sessions.get(url) ?? sessions.get(await this.createSession(url, cipher, urlString));
+  } else session = sessions.get(url) ?? sessions.get(await this.createSession(url, cipher, url));
 
   session.rejectionCallbacks.push(promise.reject);
 
