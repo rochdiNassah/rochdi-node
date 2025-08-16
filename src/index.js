@@ -87,10 +87,10 @@ Http2Client.prototype._request = async function (method, urlString, opts) {
 
   if (void 0 !== sessionKey) {
     session = sessions.get(sessionKey);
-    if (!session || session.destroyed || session.closed) session = sessions.get(this.createSession(url, cipher, sessionKey));
+    if (!session || session.cipher !== cipher || session.destroyed || session.closed) session = sessions.get(this.createSession(url, cipher, sessionKey));
   } else {
     session = sessions.get(url);
-    if (!session || session.destroyed || session.closed) session = sessions.get(this.createSession(url, cipher, url));
+    if (!session || session.cipher !== cipher || session.destroyed || session.closed) session = sessions.get(this.createSession(url, cipher, url));
   }
 
   const req = session.request(options).once('error', onerror.bind(this, arguments, rr)).once('response', headers => onresponse(headers, req, rr));
