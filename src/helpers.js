@@ -1,6 +1,35 @@
 'use strict';
 
+// anti production
 global.exit = (...data) => (console.log(...data), process.exit());
+
+const timerRegistry = {};
+exports.endTimer = function (label, format = true) {
+  if ('string' !== typeof label || !label.length) {
+    throw new Error('helpers.endTimer: Expects label to be of type string and of length greater than 1.');
+  }
+  const currDate = new Date();
+  const prevDate = timerRegistry[label];
+
+  delete timerRegistry[label];
+
+  const result = currDate-prevDate;
+  return format && result ? exports.formatDuration(result) : result;
+};
+
+exports.startTimer = function (label) {
+  if ('string' !== typeof label || !label.length) {
+    throw new Error('helpers.startTimer: Expects label to be of type string and of length greater than 1.');
+  }
+  if (timerRegistry[label]) {
+    return false;
+  }
+  timerRegistry[label] = new Date();
+};
+
+exports.wait = milliseconds => {
+  return new Promise(resolve => setTimeout(resolve, milliseconds));
+};
 
 exports.formatDuration = function (ms) {
   const types = [
@@ -32,24 +61,3 @@ exports.formatDuration = function (ms) {
 exports.rand = (min, max) => {
   return Math.round(min+(Math.random()*(max-min)));
 };
-
-exports.padString = (string, padding, length = null, padRight = true) => {
-  if (!Number.isInteger(length)) {
-    if (padRight) {
-      if (!string.endsWith(padding)) {
-        string += padding;
-      }
-    } else {
-      if (!string.startsWith(padding)) {
-        string = padding + string;
-      }
-    }
-  } else if (length !== string.length && length > 0) {
-    if (padRight) {
-      string += padding.repeat(length - string.length);
-    } else {
-      string = padding.repeat(length - string.length) + string;
-    }
-  }
-  return string;
-}

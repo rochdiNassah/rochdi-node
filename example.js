@@ -3,32 +3,44 @@
 const log = console.log.bind(console);
 const helpers = require('./src/helpers');
 const Http2Client = require('./src');
+const http2 = require('node:http2');
+const server = require('./server');
+const tls = require('node:tls');
 
-const { rand } = helpers;
+const { startTimer, endTimer, wait, formatDuration, rand } = helpers;
 
-const httpClient = new Http2Client({ retryOnError: false, userAgent: 'foobarbazquxquuxquuz' });
+const httpClient = new Http2Client({ retryOnError: false });
 
 const endpoints = {
-  fakeJsonApi: {
-    url: 'fake-json-api.mock.beeceptor.com/users',
+  api: {
+    url: 'https://fakestoreapi.com/products',
     cipher: '',
-    headers: {},
+    headers: {
+      'user-agent': ''
+    },
     body: {}
   },
   localhost: {
-    url: 'http://127.1:4096',
+    url: 'http://127.1:2048',
     cipher: '',
-    headers: {},
-    body: {}
+    headers: {
+      'user-agent': 'Foozilla 1.0.1',
+      'accept': 'application/json'
+    },
+    body: 'foo'
   }
 };
 
-let error = 0, ok = 0;
-function example() {
-  const { url, headers } = endpoints.fakeJsonApi, promises = [];
-  // const { url, headers } = endpoints.localhost, promises = [];
-  const sessionKey = httpClient.createSession(url);
-  for (let i = 0; 1e3 > i; ++i) promises.push(httpClient.get(url, { headers, sessionKey }).catch(err => new Object({ error: err })));
-  return Promise.all(promises).then(entries => entries.map(entry => (entry.error?error++:ok++, entry.error||new Object({ statusCode: entry.statusCode, rows: entry.data.length }))));
+const { url, headers, cipher, body } = endpoints.api;
+
+// This example will create a session, then send 1,000 requests
+// result example: Request example complete | response count: 1000, took: 11 second(s), 896ms
+async function request_example() { 
+  log('Request example is in progress...'), startTimer('requestExample');
+  const sessionKey = await httpClient.createSessionAsync(url), promises = [];
+  for (let i = 0; 1e3 > i; ++i)
+    promises.push(httpClient.get(url, { retryOnError: true, sessionKey }).then(res => log('response data rows size: %s', res.data.length)));
+  return Promise.all(promises).then(results => log('Request example complete | response count: %d, took: %s', results.length, endTimer('requestExample')));
 }
-return example().then(data => (setTimeout(Function.prototype, 1e3), log('example execution complete | error: %d, ok: %d', error, ok), httpClient.destroy()));
+
+return request_example();
