@@ -31,31 +31,27 @@ exports.wait = milliseconds => {
   return new Promise(resolve => setTimeout(resolve, milliseconds));
 };
 
+const durationTypes = [
+  [31104e6, ' year(s)'],
+  [2592e6, ' month(s)'],
+  [864e5, ' day(s)'],
+  [36e5, ' hour(s)'],
+  [6e4, ' minute(s)'],
+  [1e3, ' second(s)'],
+  [1, 'ms']
+];
 exports.formatDuration = function (ms) {
-  const types = [
-    [31104e6, ' year(s)'],
-    [2592e6, ' month(s)'],
-    [864e5, ' day(s)'],
-    [36e5, ' hour(s)'],
-    [6e4, ' minute(s)'],
-    [1e3, ' second(s)'],
-    [1, 'ms']
-  ];
-
-  const r = [];
-  for (let i = 0, t, v; i < types.length; i++) {
-    t = types[i];
-    v = Math.floor(ms/t[0]);
-    if (v) {
-      ms -= t[0]*v;
-      r.push(v+t[1]);
-      if (1 < r.length) {
-        break;
-      }
-    }  
+  const result = [];
+  for (let i = 0, type, value; i < durationTypes.length; i++) {
+    type = durationTypes[i];
+    value = Math.floor(ms/type[0]);
+    if (value) {
+      ms -= type[0]*value;
+      result.push(value+type[1]);
+      if (1 < result.length) break;
+    }
   }
-
-  return r.join(', ');
+  return result.join(', ');
 };
 
 exports.rand = (min, max) => {

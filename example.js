@@ -16,6 +16,7 @@ const endpoints = {
     url: 'https://fakestoreapi.com/products',
     cipher: '',
     headers: {
+      'accept-encoding': 'gzip, deflate, br',
       'user-agent': ''
     },
     body: {}
@@ -32,15 +33,18 @@ const endpoints = {
 };
 
 const { url, headers, cipher, body } = endpoints.api;
+let counter = 0;
 
 // This example will create a session, then send 1,000 requests
-// result example: Request example complete | response count: 1000, took: 11 second(s), 896ms
-async function request_example() { 
-  log('Request example is in progress...'), startTimer('requestExample');
+// result example: Request example complete | response count: 1000, took: 4 second(s), 620ms
+async function request_example() {
+  const timerLabel = 'requestExample#'+counter++;
+  log('Request example is in progress...'), startTimer(timerLabel);
   const sessionKey = await httpClient.createSessionAsync(url), promises = [];
   for (let i = 0; 1e3 > i; ++i)
-    promises.push(httpClient.get(url, { retryOnError: true, sessionKey }).then(res => log('response data rows size: %s', res.data.length)));
-  return Promise.all(promises).then(results => log('Request example complete | response count: %d, took: %s', results.length, endTimer('requestExample')));
+    promises.push(httpClient.get(url, { retryOnError: true, headers, sessionKey }).then(res => log('response data rows size: %s', res.data.length)));
+  return Promise.all(promises).then(results => log('Request example complete | response count: %d, took: %s', results.length, endTimer(timerLabel)));
 }
 
-return request_example();
+// request_example().then(request_example).then(request_example).then(request_example).then(httpClient.destroy.bind(httpClient));
+request_example().then(httpClient.destroy.bind(httpClient));

@@ -1,9 +1,10 @@
 'use strict';
 
-const log = (...args) => (args[0] = '[server] '+args[0], console.log(...args));
+const log = console.log.bind(console);
 const http2 = require('node:http2');
 const helpers = require('../src/helpers');
 const fs = require('node:fs');
+const zlib = require('node:zlib');
 
 const { rand } = helpers;
 
@@ -22,10 +23,35 @@ function on_session(session) {
   session.on('stream', (stream, headers, flags) => {
     let data = '';
     stream.on('data', chunk => data += chunk);
+
+    let respondseData = JSON.stringify({ processed_at: Date.now(), echo: { method: headers[':method'], userAgent: headers['user-agent'], data } });
+    
+    const acceptEncoding = headers['accept-encoding'];
+    const responseHeaders = {
+      ':status': 200
+    };
+
+    if (acceptEncoding) {
+      const match = Array.from(new RegExp(/(\w+)/g)[Symbol.matchAll](acceptEncoding));
+      if (match.length) {
+        const contentEncoding = match[0][0];
+        if (['gzip', 'deflate', 'br'].includes(contentEncoding)) {
+          responseHeaders['content-encoding'] = contentEncoding;
+          if ('gzip' === contentEncoding) {
+            respondseData = zlib.gzipSync(respondseData);
+          } else if ('deflate' === contentEncoding) {
+            respondseData = zlib.deflateSync(respondseData);
+          } else if ('br' === contentEncoding) {
+            respondseData = zlib.brotliCompressSync(respondseData);
+          }
+        }
+      }
+    }
+
     stream.once('end', () => {
-      stream.respond({ ':status': 200, 'content-type': 'application/json' });
-      stream.end(JSON.stringify({ processed_at: Date.now(), echo: { method: headers[':method'], userAgent: headers['user-agent'], data } }));
-    })
+      stream.respond(responseHeaders)
+      stream.end(respondseData);
+    });
   });
 }
 

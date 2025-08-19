@@ -43,7 +43,7 @@ Http2Client.prototype.destroy = function () {
 Http2Client.prototype.createSessionAsync = function () {
   return new Promise(resolve => {
     const key = this.createSession(...arguments);
-    this.sessions.get(key).once('connect', () => resolve(key));
+    this.sessions.get(key).on('connect', () => resolve(key));
   });
 }
 
@@ -52,9 +52,9 @@ Http2Client.prototype.createSession = function (authority, cipher, key) {
 
   if (cipher) setImmediate(() => tls.DEFAULT_CIPHERS = DEFAULT_CIPHERS), tls.DEFAULT_CIPHERS = cipher;
 
-  const session = http2.connect(authority, () => log('session connect ok(%s)', session.key))
-    .once('error', err => log('session error |', err.code))
-    .once('close', () => log('session close'));
+  const session = http2.connect(authority, () => log('session connect ok(%s)', session.key));
+
+  session.once('error', e => log('session error|', e.code)).once('close', () => log('session close'));
   
   if (void 0 === key) key = this.sessionCounter++;
 
@@ -66,7 +66,7 @@ Http2Client.prototype.createSession = function (authority, cipher, key) {
 };
 
 Http2Client.prototype._request = async function (method, urlString, opts = {}) { 
-  const { body, cipher, sessionKey } = opts;
+  const { body, cipher } = opts;
   const { protocol, host, path } = urlParser(urlString);
   const { sessions, userAgent } = this;
 
@@ -76,35 +76,23 @@ Http2Client.prototype._request = async function (method, urlString, opts = {}) {
   for (let i = 0, key, match; headerKeys.length > i; ++i) {
     key = headerKeys[i];
     if (match = USER_AGENT_REGEXP.exec(key)) {
-      if (!headers[key].length) headers[key] = userAgent ?? DEFAULT_USER_AGENT;
+      if (!headers[key].length)
+          headers[key] = userAgent ?? DEFAULT_USER_AGENT;
       break;
     }
   }
-  
-  let session, rr;
 
+  const authority = protocol+'//'+host;
+  const sessionKey = opts.sessionKey ?? authority;
   const options = { ':scheme': 'https', ':method': method, ':path': path, ...headers };
-  const authority = protocol+'//'+host, promise = new Promise((resolve, reject) => rr = { resolve, reject });
 
-  if (void 0 !== sessionKey) {
-    session = sessions.get(sessionKey);
-    if (
-      !session ||
-      session.cipher !== cipher ||
-      session.destroyed ||
-      session.closed
-    ) session = sessions.get(this.createSession(authority, cipher, sessionKey));
-  } else {
-    session = sessions.get(authority);
-    if (
-      !session ||
-      session.cipher !== cipher ||
-      session.destroyed ||
-      session.closed
-    ) session = sessions.get(this.createSession(authority, cipher, authority));
+  let rr, session = sessions.get(sessionKey);
+  if (!session || cipher !== session.cipher || session.destroyed || session.closed) {
+    session = sessions.get(this.createSession(authority, cipher, sessionKey));
   }
 
-  const stream = session.request(options).once('error', onerror.bind(this, arguments, rr)).once('response', h => onresponse(h, stream, rr));
+  const promise = new Promise((resolve, reject) => rr = { resolve, reject });
+  const stream = session.request(options).on('error', onerror.bind(this, arguments, rr)).on('response', h => onresponse(h, stream, rr));
   return body && stream.write('object' === typeof body ? JSON.stringify(body) : body), stream.end(), promise;
 };
 
@@ -116,17 +104,21 @@ function onerror(args, promise, err) {
   log('request error, retrying in %s...', formatDuration(jitter));
 }
 
-function onresponse(headers, stream, promise) {
+async function onresponse(headers, stream, promise) {
   const responseBuffer = [];
   const statusCode = headers[':status'];
   const responseEncoding = headers['content-encoding'];
-  const responseType = headers['content-type'];
 
   if ('gzip' === responseEncoding) stream = stream.pipe(zlib.createGunzip());
+  else if ('deflate' === responseEncoding) stream = stream.pipe(zlib.createInflate());
+  else if ('br' === responseEncoding) stream = stream.pipe(zlib.createBrotliDecompress());
 
   stream.on('data', responseBuffer.push.bind(responseBuffer))
-  stream.once('end', () => {
-    const data = 'application/json' === responseType ? JSON.parse(String(Buffer.concat(responseBuffer))) : String(Buffer.concat(responseBuffer));
+  stream.on('end', () => {
+    let data = String(Buffer.concat(responseBuffer));
+    try {
+      data = JSON.parse(data);
+    } catch {}
     promise.resolve({ headers, data, statusCode });
   });
 }
