@@ -45,7 +45,7 @@ Http2Client.prototype.createSessionAsync = function () {
     const key = this.createSession(...arguments);
     this.sessions.get(key).on('connect', resolve.bind(void 0, key));
   });
-}
+};
 
 Http2Client.prototype.createSession = function (authority, cipher, key) {
   const { sessions, logger } = this;
