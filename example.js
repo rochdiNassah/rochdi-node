@@ -34,7 +34,6 @@ const endpoints = {
 
 const { url, headers, cipher, body } = endpoints.api;
 let counter = 0;
-
 // This example will create a session, then send 1,000 requests
 // result example: Request example complete | response count: 1000, took: 4 second(s), 620ms
 async function request_example() {

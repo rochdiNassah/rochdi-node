@@ -49,13 +49,15 @@ Http2Client.prototype.createSessionAsync = function () {
 
 Http2Client.prototype.createSession = function (authority, cipher, key) {
   const { sessions } = this;
-
-  if (cipher) setImmediate(() => tls.DEFAULT_CIPHERS = DEFAULT_CIPHERS), tls.DEFAULT_CIPHERS = cipher;
-
-  const session = http2.connect(authority, () => log('session connect ok(%s)', session.key));
-
-  session.once('error', e => log('session error|', e.code)).once('close', () => log('session close'));
   
+  if (cipher) tls.DEFAULT_CIPHERS = cipher;
+
+  const session = http2.connect(authority, () => log('session connect ok(%s)', session.key))
+    .on('error', e => log('session error |', e.code))
+    .on('close', () => log('session close'));
+
+  tls.DEFAULT_CIPHERS = DEFAULT_CIPHERS;
+    
   if (void 0 === key) key = this.sessionCounter++;
 
   session.key = key;
