@@ -22,6 +22,6 @@
   },
   "homepage": "https://github.com/rochdiNassah/http2-client#readme",
   "devDependencies": {
-    "jasmine": "^5.9.0"
+    "jasmine": ">0"
   }
 }

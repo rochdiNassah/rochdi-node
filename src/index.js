@@ -1,6 +1,5 @@
 'use strict';
 
-const log = console.log.bind(console);
 const http2 = require('node:http2');
 const zlib = require('node:zlib');
 const urlParser = require('node:url').parse;
@@ -17,10 +16,11 @@ const USER_AGENT_REGEXP = new RegExp(/^user\-agent$/i);
 module.exports = Http2Client;
 
 function Http2Client(opts = {}) {
-  const { retryOnError, userAgent } = opts;
+  const { logger, retryOnError, userAgent } = opts;
 
   this.retryOnError = retryOnError ?? true;
   this.userAgent = userAgent;
+  this.logger = logger ?? Function.prototype;
 
   this.sessions = new Map();
   this.sessionCounter = 0;
@@ -48,13 +48,13 @@ Http2Client.prototype.createSessionAsync = function () {
 }
 
 Http2Client.prototype.createSession = function (authority, cipher, key) {
-  const { sessions } = this;
+  const { sessions, logger } = this;
   
   if (cipher) tls.DEFAULT_CIPHERS = cipher;
 
-  const session = http2.connect(authority, () => log('session connect ok(%s)', session.key))
-    .on('error', e => log('session error |', e.code))
-    .on('close', () => log('session close'));
+  const session = http2.connect(authority, () => logger('session connect ok(%s)', session.key))
+    .on('error', err => logger('session error(%s), %s', session.key, err.code))
+    .on('close', () => logger('session close(%s)', session.key));
 
   tls.DEFAULT_CIPHERS = DEFAULT_CIPHERS;
     
@@ -64,7 +64,7 @@ Http2Client.prototype.createSession = function (authority, cipher, key) {
   session.cipher = cipher;
   session.authority = authority;
 
-  return sessions.set(key, session), log('session created (%s)', 'string' === typeof key ? 'auto' : 'manual'), key;
+  return sessions.set(key, session), logger('session created(%s)', 'string' === typeof key ? 'auto' : 'manual'), key;
 };
 
 Http2Client.prototype._request = async function (method, urlString, opts = {}) { 
@@ -99,11 +99,13 @@ Http2Client.prototype._request = async function (method, urlString, opts = {}) {
 };
 
 function onerror(args, promise, err) {
-  if (!((args[2] && args[2].retryOnError) ?? this.retryOnError)) return promise.reject(err.code);
+  const { logger, retryOnError } = this;
+
+  if (!((args[2] && args[2].retryOnError) ?? retryOnError)) return promise.reject(err.code);
 
   const jitter = rand(1e3, 4e3);
   setTimeout(() => promise.resolve(this._request(...args)), jitter);
-  log('request error, retrying in %s...', formatDuration(jitter));
+  logger('request error, retrying in %s...', formatDuration(jitter));
 }
 
 async function onresponse(headers, stream, promise) {
