@@ -25,7 +25,8 @@ const endpoints = {
     url: 'http://127.1:2048',
     cipher: '',
     headers: {
-      'user-agent': 'Foozilla 1.0.1',
+      'accept-encoding': 'gzip, deflate, br',
+      'user-agent': 'foo/32.16.2',
       'accept': 'application/json'
     },
     body: 'foo'
@@ -33,17 +34,21 @@ const endpoints = {
 };
 
 const { url, headers, cipher, body } = endpoints.api;
-let counter = 0;
-// This example will create a session, then send 1,000 requests
-// result example: Request example complete | response count: 1000, took: 4 second(s), 620ms
-async function request_example() {
-  const timerLabel = 'requestExample#'+counter++;
-  log('Request example is in progress...'), startTimer(timerLabel);
-  const sessionKey = await httpClient.createSessionAsync(url), promises = [];
-  for (let i = 0; 1e3 > i; ++i)
-    promises.push(httpClient.get(url, { retryOnError: true, headers, sessionKey }).then(res => log('response data rows size: %s', res.data.length)));
-  return Promise.all(promises).then(results => log('Request example complete | response count: %d, took: %s', results.length, endTimer(timerLabel)));
+
+// this example will create a session, then send 1,000 asynchronous requests
+// result example: 
+function request_example() {
+  log('request example execution in progress...'), startTimer('request_example');
+  return httpClient.createSessionAsync(url).then(sessionKey => {
+    const promises = [];
+    for (let i = 0; 1e3 > i; ++i)
+      promises.push(
+        httpClient.get(url, { retryOnErrWor: true, headers, sessionKey }).then(({ data }) => log('response data rows size: %s', data.length))
+      );
+    return Promise.all(promises).then(
+      results => log('request example complete, response count: %d, took: %s', results.length, endTimer('request_example'))
+    );
+  });
 }
 
-// request_example().then(request_example).then(request_example).then(request_example).then(httpClient.destroy.bind(httpClient));
 request_example().then(httpClient.destroy.bind(httpClient));

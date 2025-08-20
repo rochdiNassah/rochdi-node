@@ -43,7 +43,7 @@ Http2Client.prototype.destroy = function () {
 Http2Client.prototype.createSessionAsync = function () {
   return new Promise(resolve => {
     const key = this.createSession(...arguments);
-    this.sessions.get(key).on('connect', () => resolve(key));
+    this.sessions.get(key).on('connect', resolve.bind(void 0, key));
   });
 }
 
@@ -67,7 +67,7 @@ Http2Client.prototype.createSession = function (authority, cipher, key) {
   return sessions.set(key, session), logger('session created(%s)', 'string' === typeof key ? 'auto' : 'manual'), key;
 };
 
-Http2Client.prototype._request = async function (method, urlString, opts = {}) { 
+Http2Client.prototype._request = function (method, urlString, opts = {}) { 
   const { body, cipher } = opts;
   const { protocol, host, path } = urlParser(urlString);
   const { sessions, userAgent } = this;
@@ -108,7 +108,7 @@ function onerror(args, promise, err) {
   logger('request error, retrying in %s...', formatDuration(jitter));
 }
 
-async function onresponse(headers, stream, promise) {
+function onresponse(headers, stream, promise) {
   const responseBuffer = [];
   const statusCode = headers[':status'];
   const responseEncoding = headers['content-encoding'];
@@ -120,9 +120,7 @@ async function onresponse(headers, stream, promise) {
   stream.on('data', responseBuffer.push.bind(responseBuffer))
   stream.on('end', () => {
     let data = String(Buffer.concat(responseBuffer));
-    try {
-      data = JSON.parse(data);
-    } catch {}
+    try { data = JSON.parse(data) } catch {}
     promise.resolve({ headers, data, statusCode });
   });
 }
