@@ -36,7 +36,7 @@ const endpoints = {
 const { url, headers, cipher, body } = endpoints.api;
 
 // this example will create a session, then send 1,000 asynchronous requests
-// result example: 
+// result example: request example complete, response count: 1000, took: 4 second(s), 685ms
 function request_example() {
   log('request example execution in progress...'), startTimer('request_example');
   return httpClient.createSessionAsync(url).then(sessionKey => {
