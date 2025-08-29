@@ -1,26 +1,17 @@
 {
-  "name": "rochdi-http2client",
-  "version": "2.1.4",
-  "description": "NodeJS HTTP2 Client",
+  "name": "rochdi",
+  "version": "1",
   "main": "./src/index.js",
-  "keywords": [
-    "http2",
-    "node http2 client",
-    "http2 client"
-  ],
   "scripts": {
     "test": "jasmine --config=test-config.json"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rochdiNassah/http2-client.git"
+    "url": "git+https://github.com/rochdiNassah/rochdi-node.git"
   },
   "author": "Rochdi Nassah <rochdinassah1998@gmail.com>",
   "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/rochdiNassah/http2-client/issues"
-  },
-  "homepage": "https://github.com/rochdiNassah/http2-client#readme",
+  "homepage": "https://github.com/rochdiNassah/rochdi-node",
   "devDependencies": {
     "jasmine": ">0"
   }
