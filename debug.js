@@ -1,13 +1,13 @@
 'use strict';
 
 const log = console.log.bind(console);
-const helpers = require('./src/helpers');
-const Http2Client = require('./src');
 const http2 = require('node:http2');
 const server = require('./server');
 const tls = require('node:tls');
 
-const { startTimer, endTimer, wait, formatDuration, rand } = helpers;
+const { Http2Client, helpers } = require('./src');
+
+const { startTimer, endTimer, wait, rand } = helpers;
 
 const httpClient = new Http2Client({ retryOnError: false });
 
