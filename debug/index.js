@@ -10,8 +10,11 @@ const {
   startTimer,
   endTimer,
   formatDuration,
-  wait
+  wait,
+  benchmark
 } = helpers;
+
+const input = 'foo';
 
 void async function () {
   

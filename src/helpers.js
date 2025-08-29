@@ -5,10 +5,8 @@ const https = require('node:https');
 const format = util.format;
 const http2 = require('node:http2');
 
-global.exit = function exit(...args) {
-  console.log(...args);
-  process.exit(0);
-};
+// anti production
+global.exit = (...args) => console.log(...args)(process.exit(0));
 
 const actionsLockRegistry = new Map();
 exports.lockAction = function (type, cb) {
@@ -17,59 +15,26 @@ exports.lockAction = function (type, cb) {
     cb(actionsLockRegistry.set.bind(actionsLockRegistry, type, false)),
     true
   );
-}
-
-const backoffRegistry = new Map();
-let isBackoffTriggered = false;
-exports.getBackoff = function (opts) {
-  let { type, min, max } = opts;
-
-  min = min ?? 1e3;
-  max = max ?? 192e4;
-
-  if (!isBackoffTriggered) {
-    isBackoffTriggered = true;
-    setInterval(() => {
-      backoffRegistry.forEach(backoff => {
-        const { value, counter, lastTrigger } = backoff;
-        console.log('curr:', counter);
-        if (counter) {
-          backoff.counter = Math.max(0, counter-Math.round((new Date()-lastTrigger)/value));
-        }
-      });
-    }, 6e4);
-  }
-
-  if (!backoffRegistry.has(type)) {
-    const obj = { counter: 0, value: -1, lastTrigger: null };
-    backoffRegistry.set(type, obj);
-  }
-
-  const backoff = backoffRegistry.get(type);
-
-  const value = backoff.value = Math.min(max, 2**(1+backoff.counter)+min);
-  backoff.lastTrigger = new Date();
-
-  if (value < max) {
-    backoff.counter++;
-  }
-  
-  return exports.rand(min/4, min)+value;
 };
 
-exports.benchmark = function (a, b, repetition = 10**6) {
-  const { startTimer, endTimer } = exports;
+exports.benchmark = function (...functions) {
+  const { formatDuration } = exports;
   const result = {};
+  let winner = { duration: Infinity };
 
-  startTimer('a');
-  for (let i = 0; repetition > i; ++i) a(i);
-  result.a = endTimer('a');
 
-  startTimer('b');
-  for (let i = 0; repetition > i; ++i) b(i);
-  result.b = endTimer('b');
+  functions.shuffle().forEach(func => {
+    const timeStart = new Date();
+    const label = func() ?? 'unknown';
+    const duration = new Date()-timeStart;
 
-  return result;
+    if (duration < winner.duration)
+      winner = { label, duration };
+
+    result[label] = formatDuration(duration);
+  });
+
+  return { ...result, winner: winner.label };
 };
 
 exports.parseHeaders = function (base64) {
@@ -267,7 +232,7 @@ exports.formatDuration = function (milliseconds) {
     }
   }
 
-  return result.length ? result.join(', ') : 'just now';
+  return result.length ? result.join(', ') : 'nothing!';
 };
 
 exports.probabilityCallback = function (percentage, callback, ...args) {
