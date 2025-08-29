@@ -2,7 +2,7 @@
 
 const log = console.log.bind(console);
 const http2 = require('node:http2');
-const helpers = require('../src/helpers');
+const helpers = require('../../src/helpers');
 const fs = require('node:fs');
 const zlib = require('node:zlib');
 
