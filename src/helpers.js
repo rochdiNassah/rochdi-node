@@ -237,42 +237,37 @@ const SECOND_MILLISECONDS = 1e3;
 const MINUTE_MILLISECONDS = 60*SECOND_MILLISECONDS;
 const HOUR_MILLISECONDS = 60*MINUTE_MILLISECONDS;
 const DAY_MILLISECONDS = 24*HOUR_MILLISECONDS;
-const WEEK_MILLISECONDS = 7*DAY_MILLISECONDS;
-const MONTH_MILLISECONDS = 30*DAY_MILLISECONDS;
-const YEAR_MILLISECONDS = 365*DAY_MILLISECONDS;
 
 const DURATION_FORMAT_TYPES = [
-  [YEAR_MILLISECONDS, ' year'],
-  [MONTH_MILLISECONDS, ' month'],
-  [WEEK_MILLISECONDS, ' week'],
   [DAY_MILLISECONDS, ' day'],
   [HOUR_MILLISECONDS, ' hour'],
   [MINUTE_MILLISECONDS, ' minute'],
   [SECOND_MILLISECONDS, ' second'],
   [1, 'ms'],
+  // [.001, 'µs'],
+  // [.000001, 'ns']
 ];
 
 exports.formatDuration = function (milliseconds) {
-  if (null === milliseconds || 'number' !== typeof milliseconds || Number.isNaN(milliseconds) ||0 > milliseconds)
+  let ms = milliseconds;
+  if (null === ms || 'number' !== typeof ms || Number.isNaN(ms) || 0 > ms)
     return 'unknown duration';
-  else if (1 > milliseconds)
-    return 'just now';
 
   const result = [];
-  
+
   for (let i = 0, member, value, label; DURATION_FORMAT_TYPES.length > i; ++i) {
     member = DURATION_FORMAT_TYPES[i];
-    value = ~~(milliseconds/member[0]);
+    value = ~~(ms/member[0]);
     label = member[1];
 
     if (value) {
-      milliseconds -= member[0]*value;
-      if (2 === result.push(value+label+(value > 1 && 'ms' !== label && 's' || '')))
+      ms -= member[0]*value;
+      if (2 === result.push(value+label+(value > 1 && 2 < label.length ? 's' : '')))
         break;
     }
   }
 
-  return result.join(', ');
+  return result.length ? result.join(', ') : 'just now';
 };
 
 exports.probabilityCallback = function (percentage, callback, ...args) {
