@@ -180,20 +180,27 @@ exports.request = function (opts = {}) {
       });
     });
 
-    req.once('error', async () => {
+    req.on('error', async () => {
       if (opts.awaitInternet && !await exports.checkConnectivity()) {
-        console['log']('helpers.request: Waiting for internet');
+        console['log']('helpers.request: waiting for internet');
         await exports.awaitInternet();
-        resolve(exports.request(opts));
-      } else {
-        resolve({ statusCode: -1 });
+        return resolve(exports.request(opts));
       }
+      resolve({ statusCode: -1 });
     });
 
-    if (body) {
+    if (body)
       req.write('object' === typeof body ? JSON.stringify(body) : body);
-    }
+
     req.end();
+  });
+};
+
+exports.fetchIpAddress = async function () {
+  return exports.request({ method: 'GET', hostname: 'checkip.amazonaws.com', port: 443, path: '/' }).then(res => {
+    const { statusCode, data } = res;
+    if (200 !== statusCode) throw new Error('helpers.fetchIpAddress: request error, http('+statusCode+')');
+    return data.trim();
   });
 };
 
@@ -436,11 +443,3 @@ Map.prototype.remember = function (key, value, milliseconds) {
   this.set(key, value);
 };
 // monkeypatching end
-
-const http2Client = new (require('./http2-client'))();
-exports.fetchIpAddress = async function () {
-  return http2Client.get('https://checkip.amazonaws.com').then(({ statusCode, data }) => {
-    if (200 !== statusCode) throw new Error('helpers.fetchIpAddress: request error, http('+statusCode+')');
-    return data.trim();
-  });
-};
