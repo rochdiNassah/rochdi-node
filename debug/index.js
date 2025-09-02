@@ -11,11 +11,16 @@ const {
   endTimer,
   formatDuration,
   wait,
-  benchmark
+  benchmark,
+  fetchIpAddress
 } = helpers;
 
 const input = 'foo';
 
 void async function () {
+  
+  fetchIpAddress().then(ip => {
+    log(ip);
+  });
   
 }();

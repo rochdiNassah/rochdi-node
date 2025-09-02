@@ -54,17 +54,6 @@ exports.getType = function (value) {
   return 'object' !== typeof value ? typeof value : null === value ? 'null' : Array.isArray(value) ? 'array' : 'object';
 };
 
-exports.createCodeVerifier = function () {
-  const length = Math.floor(85 * Math.random() + 43);
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
-
-  let result = '';
-  for (let i = 0; length > i; ++i) {
-    result += characters[Math.floor(Math.random() * characters.length)];
-  }
-  return exports.base64ToUrlSafe(btoa(result));
-};
-
 exports.base64ToUrlSafe = function (input) {
   return input.replace(/\+/g,"-").replace(/\//g,"_").replace(/[=]+$/,"");
 };
