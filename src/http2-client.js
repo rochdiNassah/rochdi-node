@@ -15,12 +15,13 @@ const USER_AGENT_REGEXP = new RegExp(/^user\-agent$/i);
 
 module.exports = Http2Client;
 
+const log = console.log.bind(console);
+
 function Http2Client(opts = {}) {
-  const { logger, retryOnError, userAgent } = opts;
+  const { retryOnError, userAgent } = opts;
 
   this.retryOnError = retryOnError ?? true;
   this.userAgent = userAgent;
-  this.logger = logger ?? Function.prototype;
 
   this.sessions = new Map();
   this.sessionCounter = 0;
@@ -34,10 +35,24 @@ Http2Client.prototype = new EventEmitter();
   };
 });
 
+Http2Client.prototype.set = function (propertyName, value) {
+  this[propertyName] = value;
+};
+
 Http2Client.prototype.destroy = function () {
   const { sessions } = this;
-  for (const session of sessions.values()) session.destroy();
+  for (const session of sessions.values())
+    session.destroy();
   sessions.clear();
+};
+
+Http2Client.prototype.endSession = function (key) {
+  const { sessions } = this;
+  const session = sessions.get(key);
+  if (session) {
+    sessions.delete(key);
+    session.destroy();
+  }
 };
 
 Http2Client.prototype.createSessionAsync = function () {
@@ -48,23 +63,23 @@ Http2Client.prototype.createSessionAsync = function () {
 };
 
 Http2Client.prototype.createSession = function (authority, cipher, key) {
-  const { sessions, logger } = this;
+  const { sessions } = this;
   
-  if (cipher) tls.DEFAULT_CIPHERS = cipher;
+  if (cipher)
+    tls.DEFAULT_CIPHERS = cipher;
 
-  const session = http2.connect(authority, () => logger('session connect ok(%s)', session.key))
-    .on('error', err => logger('session error(%s), %s', session.key, err.code))
-    .on('close', () => logger('session close(%s)', session.key));
+  const session = http2.connect(authority).on('error', onsessionerror).on('close', onsessionclose).on('connect', onsessionconnect);
 
   tls.DEFAULT_CIPHERS = DEFAULT_CIPHERS;
     
-  if (void 0 === key) key = this.sessionCounter++;
+  if (void 0 === key)
+    key = this.sessionCounter++;
 
   session.key = key;
   session.cipher = cipher;
   session.authority = authority;
 
-  return sessions.set(key, session), logger('session created(%s)', 'string' === typeof key ? 'auto' : 'manual'), key;
+  return sessions.set(key, session), log('session created(%s)', 'string' === typeof key ? 'auto' : 'manual'), key;
 };
 
 Http2Client.prototype._request = function (method, urlString, opts = {}) { 
@@ -99,13 +114,13 @@ Http2Client.prototype._request = function (method, urlString, opts = {}) {
 };
 
 function onerror(args, promise, err) {
-  const { logger, retryOnError } = this;
+  const { retryOnError } = this;
 
   if (!((args[2] && args[2].retryOnError) ?? retryOnError)) return promise.reject(err.code);
 
   const jitter = rand(1e3, 4e3);
   setTimeout(() => promise.resolve(this._request(...args)), jitter);
-  logger('request error, retrying in %s...', formatDuration(jitter));
+  log('request error, retrying in %s...', formatDuration(jitter));
 }
 
 function onresponse(headers, stream, promise) {
@@ -123,4 +138,23 @@ function onresponse(headers, stream, promise) {
     try { data = JSON.parse(data) } catch {}
     promise.resolve({ headers, data, statusCode });
   });
+}
+
+function onsessionerror(error) {
+  log('session error(%s), %s', this.key, error.code);
+}
+function onsessionclose() {
+  log('session close(%s)', this.key);
+  clearInterval(this.pingIntervalId);
+}
+function onsessionconnect() {
+  log('session connect ok(%s)', this.key);
+  this.pingIntervalId = setInterval(pingsession.bind(this), 59e3);
+}
+
+const pingBuffer = Buffer.from('pingpong');
+const noop = Function.prototype;
+function pingsession() {
+  log('ping sent');
+  return this.ping(pingBuffer, noop);
 }

@@ -64,30 +64,25 @@ exports.decodeHTMLEntities = function (input) {
 };
 
 const timerRegistry = {};
-exports.endTimer = function (label, format = true) {
-  if ('string' !== typeof label || !label.length) {
-    throw new Error('helpers.endTimer: label must be a valid string');
-  }
+exports.startTimer = function (label) {
+  return timerRegistry[label] ? false : (timerRegistry[label] = new Date(), true);
+};
 
+exports.getTimer = function (label, format = true) {
   const currDate = new Date();
   const prevDate = timerRegistry[label];
 
-  if (void 0 === prevDate) return null;
-
-  delete timerRegistry[label];
+  if (void 0 === prevDate)
+    return null;
 
   const result = currDate-prevDate;
-  return format && result ? exports.formatDuration(result) : result;
+  return format ? exports.formatDuration(result) : result;
 };
 
-exports.startTimer = function (label) {
-  if ('string' !== typeof label || !label.length) {
-    throw new Error('helpers.startTimer: Expects label to be of type string and of length greater than 1.');
-  }
-  if (timerRegistry[label]) {
-    return false;
-  }
-  timerRegistry[label] = new Date();
+exports.endTimer = function (label, format = true) {
+  const timer = exports.getTimer(label, format);
+  timerRegistry[label] = void 0;
+  return timer;
 };
 
 exports.padString = function (string, padding, length = null, padRight = true) {
@@ -160,16 +155,16 @@ exports.fetchIpAddress = async function () {
 };
 
 exports.checkConnectivity = function () {
-  return new Promise(r => {
-    const client = http2.connect('http://ankama.com');
-    client.once('error', () => {
-      client.destroy();
-      r(false);
-    });
-    client.once('connect', () => {
-      client.destroy();
-      r(true);
-    });
+  return new Promise(resolve => {
+    http2.connect('http://google.com')
+      .on('error', function () {
+        this.destroy();
+        resolve(false);
+      })
+      .on('connect', function () {
+        this.destroy();
+        resolve(true);
+      });
   });
 };
 

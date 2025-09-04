@@ -4,12 +4,15 @@ const log = console.log.bind(console);
 
 const util = require('node:util');
 const { format } = util;
-const { helpers, http2Client } = require('../src');
+const { helpers, Http2Client } = require('../src');
+const http2 = require('node:http2');
 
 // publish shorthand: 
 
 const {
+  checkConnectivity,
   startTimer,
+  getTimer,
   endTimer,
   formatDuration,
   wait,
@@ -20,9 +23,9 @@ const {
 const input = 'foo';
 
 void async function () {
-  
-  fetchIpAddress().then(ip => {
-    log(ip);
-  });
-  
+  const httpClient = new Http2Client({ retryOnError: false, userAgent: void 0 });
+
+  const sk = httpClient.createSession('https://proxyconnection.touch.dofus.com',  void 0, 'https://proxyconnection.touch.dofus.com');
+
+  log(sk);
 }();
