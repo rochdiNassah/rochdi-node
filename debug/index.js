@@ -6,6 +6,8 @@ const util = require('node:util');
 const { format } = util;
 const { helpers, http2Client } = require('../src');
 
+// publish shorthand: 
+
 const {
   startTimer,
   endTimer,

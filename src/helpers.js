@@ -47,7 +47,7 @@ exports.parseHeaders = function (base64) {
     const [key, value] = line.split(/:\s/);
     result[key] = value;
   });
-  return result;
+  return console.log(result), result;
 };
 
 exports.getType = function (value) {
