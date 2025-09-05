@@ -146,7 +146,7 @@ Http2Client.prototype._request = function (method, urlString, opts = {}) {
 
   const stream = session.request(options)
     .on('error', onerror.bind(this, arguments, rr))
-    .on('response', h => onresponse(h, stream, session, rr));
+    .on('response', h => onresponse(h, stream, rr));
 
   if (body)
     stream.write('object' === typeof body ? JSON.stringify(body) : body);
@@ -167,7 +167,7 @@ function onerror(args, promise, err) {
   log('request error, retrying in %s...', formatDuration(jitter));
 }
 
-function onresponse(headers, stream, session, promise) {
+function onresponse(headers, stream, promise) {
   const responseBuffer = [];
   const statusCode = headers[':status'];
   const responseEncoding = headers['content-encoding'];
@@ -184,7 +184,7 @@ function onresponse(headers, stream, session, promise) {
     try {
       data = JSON.parse(data);
     } catch {}
-    promise.resolve({ headers, data, statusCode, session });
+    promise.resolve({ headers, data, statusCode });
   });
 }
 
