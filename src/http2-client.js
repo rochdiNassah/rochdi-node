@@ -170,7 +170,6 @@ function onsessionclose() {
 function onsessionconnect() {
   log('session connect ok(%s)', this.key);
   if (this.keepalive) {
-    log('keepalive ok');
     this.pingIntervalId = setInterval(pingsession.bind(this), 59e3);
   }
 }
