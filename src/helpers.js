@@ -116,6 +116,12 @@ exports.request = function (urlString, opts = {}) {
 
     let mod, port;
     'https:' === protocol ? (mod = https, port = 443) : (mod = http, port = 80);
+
+    if (body) {
+      if ('object' === typeof body)
+        body = JSON.stringify(body);
+      headers['Content-Length'] = Buffer.byteLength(body);
+    }
     
     const req = mod.request({ hostname, port, path, method, headers, agent: https === mod ? agent : void 0 }, res => {
       const buff = [];
@@ -136,8 +142,7 @@ exports.request = function (urlString, opts = {}) {
       });
     });
 
-    req.on('error', async (err) => {
-      console.log(err);
+    req.on('error', async () => {
       if (opts.awaitInternet && !await exports.checkConnectivity()) {
         console['log']('helpers.request: waiting for internet');
         await exports.awaitInternet();
@@ -147,8 +152,8 @@ exports.request = function (urlString, opts = {}) {
     });
 
     if (body)
-      req.write('object' === typeof body ? JSON.stringify(body) : body);
-
+      req.write(body);
+    
     req.end();
   });
 };
