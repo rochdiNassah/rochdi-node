@@ -24,29 +24,4 @@ const input = 'foo';
 
 void async function () {
   const httpClient = new Http2Client({ retryOnError: false, userAgent: void 0 });
-
-  const endpoints = [
-    {
-      authority: 'https://proxyconnection.touch.dofus.com',
-      cipher: void 0
-    },
-    {
-      authority: 'https://haapi.ankama.com',
-      cipher: void 0
-    },
-  ];
-  
-  await httpClient.createSessionsAsync(endpoints);
-
-  httpClient.get('https://proxyconnection.touch.dofus.com').then(res => {
-    log(res.statusCode);
-
-    httpClient.get('https://proxyconnection.touch.dofus.com').then(res => {
-    log(res.statusCode);
-  });
-
-  httpClient.get('https://proxyconnection.touch.dofus.com').then(res => {
-    log(res.statusCode);
-  });
-  });
 }();
