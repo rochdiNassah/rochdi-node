@@ -128,9 +128,9 @@ exports.request = function (urlString, opts = {}) {
         let data = Buffer.concat(buff).toString();
         try {
           data = JSON.parse(data);
-        } catch (e) {}
-        res.data = data;
-        resolve(res);
+        } catch {}
+        const { statusCode, headers } = res;
+        resolve({ statusCode, data, headers });
       });
     });
 
