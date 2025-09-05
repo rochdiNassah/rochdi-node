@@ -4,6 +4,7 @@ const util = require('node:util');
 const https = require('node:https');
 const format = util.format;
 const http2 = require('node:http2');
+const http = require('node:http');
 const parseUrl = require('node:url').parse;
 
 // anti production
@@ -113,9 +114,10 @@ exports.request = function (urlString, opts = {}) {
     const { method, headers, body } = opts;
     const { protocol, hostname, path } = parseUrl(urlString);
 
-    const port = 'https:' === protocol ? 443 : 80;
-
-    const req = https.request({ hostname, port, path, method, headers, agent }, res => {
+    let mod, port;
+    'https:' === protocol ? (mod = https, port = 443) : (mod = http, port = 80);
+    
+    const req = mod.request({ hostname, port, path, method, headers, agent: https === mod ? agent : void 0 }, res => {
       const buff = [];
       if ('gzip' === res.headers['content-encoding']) {
         const zlib = require('zlib');
@@ -134,7 +136,8 @@ exports.request = function (urlString, opts = {}) {
       });
     });
 
-    req.on('error', async () => {
+    req.on('error', async (err) => {
+      console.log(err);
       if (opts.awaitInternet && !await exports.checkConnectivity()) {
         console['log']('helpers.request: waiting for internet');
         await exports.awaitInternet();
