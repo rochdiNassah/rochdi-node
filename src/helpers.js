@@ -4,6 +4,7 @@ const util = require('node:util');
 const https = require('node:https');
 const format = util.format;
 const http2 = require('node:http2');
+const parseUrl = require('node:url').parse;
 
 // anti production
 global.exit = (...args) => console.log(...args)(process.exit(0));
@@ -107,9 +108,12 @@ exports.padString = function (string, padding, length = null, padRight = true) {
 };
 
 const agent = new https.Agent({ keepAlive: true, maxSockets: Infinity });
-exports.request = function (opts = {}) {
+exports.request = function (urlString, opts = {}) {
   return new Promise(resolve => {
-    const { hostname, port, path, method, headers, body } = opts;
+    const { method, headers, body } = opts;
+    const { protocol, hostname, path } = parseUrl(urlString);
+
+    const port = 'https:' === protocol ? 443 : 80;
 
     const req = https.request({ hostname, port, path, method, headers, agent }, res => {
       const buff = [];

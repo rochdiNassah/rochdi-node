@@ -10,6 +10,7 @@ const http2 = require('node:http2');
 // publish shorthand: 
 
 const {
+  request,
   checkConnectivity,
   startTimer,
   getTimer,
@@ -24,4 +25,8 @@ const input = 'foo';
 
 void async function () {
   const httpClient = new Http2Client({ retryOnError: true, userAgent: void 0 });
+
+  request('https://google.com').then(res => {
+    log(res.data);
+  });
 }();
