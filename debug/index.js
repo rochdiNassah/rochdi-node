@@ -23,5 +23,5 @@ const {
 const input = 'foo';
 
 void async function () {
-  const httpClient = new Http2Client({ retryOnError: false, userAgent: void 0 });
+  const httpClient = new Http2Client({ retryOnError: true, userAgent: void 0 });
 }();

@@ -15,7 +15,10 @@ const USER_AGENT_REGEXP = new RegExp(/^user\-agent$/i);
 
 module.exports = Http2Client;
 
-const log = console.log.bind(console);
+function log() {
+  arguments[0] = '[http2-client] '+arguments[0];
+  console.log(...arguments);
+}
 
 function Http2Client(opts = {}) {
   const { retryOnError, userAgent } = opts;
@@ -46,7 +49,16 @@ Http2Client.prototype.createSession = function (authority, cipher, key, keepaliv
     tls.DEFAULT_CIPHERS = cipher;
   }
 
-  const session = http2.connect(authority).on('error', onsessionerror).on('close', onsessionclose).on('connect', onsessionconnect);
+  const session = http2.connect(authority)
+    .on('error', onsessionerror)
+    .on('close', onsessionclose)
+    .on('connect', onsessionconnect);
+
+  session.__proto__._close = session.__proto__.close;
+  session.__proto__.close = function () {
+    this.destroy();
+    this._close();
+  };
 
   tls.DEFAULT_CIPHERS = DEFAULT_CIPHERS;
 
@@ -80,8 +92,8 @@ Http2Client.prototype.createSessionsAsync = function (endpoints) {
 
 Http2Client.prototype.ensureSession = function (session, cipher) {
   if ('object' === typeof session) {
-    const { key, authority, cipher, keepalive, closed, destroyed } = session;
-    return closed || destroyed ? this.createSession(authority, cipher, key, keepalive) : session;
+    const { key, authority, cipher, keepalive, destroyed } = session;
+    return destroyed ? this.createSession(authority, cipher, key, keepalive) : session;
   }
 
   const authority = session;
@@ -91,13 +103,20 @@ Http2Client.prototype.ensureSession = function (session, cipher) {
   if (
     !session ||
     session.cipher !== cipher ||
-    session.closed ||
     session.destroyed
   ) {
     return this.createSession(authority, cipher, authority);
   }
 
   return session;
+};
+
+Http2Client.prototype.destroy = function () {
+  const { sessions } = this;
+  for (const session of sessions.values()) {
+    session.destroy();
+  }
+  sessions.clear();
 };
 
 Http2Client.prototype._request = function (method, urlString, opts = {}) { 
@@ -125,7 +144,9 @@ Http2Client.prototype._request = function (method, urlString, opts = {}) {
   let rr;
   const promise = new Promise((resolve, reject) => rr = { resolve, reject });
 
-  const stream = session.request(options).on('error', onerror.bind(this, arguments, rr)).on('response', h => onresponse(h, stream, rr));
+  const stream = session.request(options)
+    .on('error', onerror.bind(this, arguments, rr))
+    .on('response', h => onresponse(h, stream, session, rr));
 
   if (body)
     stream.write('object' === typeof body ? JSON.stringify(body) : body);
@@ -135,28 +156,35 @@ Http2Client.prototype._request = function (method, urlString, opts = {}) {
 
 function onerror(args, promise, err) {
   const { retryOnError } = this;
+  const opts = args[2];
 
-  if (!((args[2] && args[2].retryOnError) ?? retryOnError)) return promise.reject(err.code);
+  if (!((opts && opts.retryOnError) ?? retryOnError)) {
+    return promise.reject(err.code);
+  }
 
   const jitter = rand(1e3, 4e3);
   setTimeout(() => promise.resolve(this._request(...args)), jitter);
   log('request error, retrying in %s...', formatDuration(jitter));
 }
 
-function onresponse(headers, stream, promise) {
+function onresponse(headers, stream, session, promise) {
   const responseBuffer = [];
   const statusCode = headers[':status'];
   const responseEncoding = headers['content-encoding'];
 
-  if ('gzip' === responseEncoding) stream = stream.pipe(zlib.createGunzip());
-  else if ('deflate' === responseEncoding) stream = stream.pipe(zlib.createInflate());
-  else if ('br' === responseEncoding) stream = stream.pipe(zlib.createBrotliDecompress());
+  switch (responseEncoding) {
+    case 'gzip': stream = stream.pipe(zlib.createGunzip()); break;
+    case 'deflate': stream = stream.pipe(zlib.createInflate()); break;
+    case 'br': stream = stream.pipe(zlib.createBrotliDecompress()); break;
+  }
 
   stream.on('data', responseBuffer.push.bind(responseBuffer))
   stream.on('end', () => {
     let data = String(Buffer.concat(responseBuffer));
-    try { data = JSON.parse(data) } catch {}
-    promise.resolve({ headers, data, statusCode });
+    try {
+      data = JSON.parse(data);
+    } catch {}
+    promise.resolve({ headers, data, statusCode, session });
   });
 }
 
