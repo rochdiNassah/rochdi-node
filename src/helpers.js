@@ -108,14 +108,17 @@ exports.padString = function (string, padding, length = null, padRight = true) {
   return string;
 };
 
-const agent = new https.Agent({ keepAlive: true, maxSockets: Infinity });
+const agents = {
+  https: new https.Agent({ keepAlive: true, maxSockets: Infinity }),
+  http: new http.Agent({ keepAlive: true, maxSockets: Infinity }),
+};
 exports.request = function (urlString, opts = {}) {
   return new Promise(resolve => {
     const { method, headers, body } = opts;
     const { protocol, hostname, path } = parseUrl(urlString);
 
-    let mod, port;
-    'https:' === protocol ? (mod = https, port = 443) : (mod = http, port = 80);
+    let mod, port, agent;
+    'https:' === protocol ? (mod = https, port = 443, agent = agents.https) : (mod = http, port = 80, agent = agents.http);
 
     if (body) {
       if ('object' === typeof body)
@@ -123,7 +126,7 @@ exports.request = function (urlString, opts = {}) {
       headers['Content-Length'] = Buffer.byteLength(body);
     }
     
-    const req = mod.request({ hostname, port, path, method, headers, agent: https === mod ? agent : void 0 }, res => {
+    const req = mod.request({ hostname, port, path, method, headers, agent }, res => {
       const buff = [];
       if ('gzip' === res.headers['content-encoding']) {
         const zlib = require('zlib');
