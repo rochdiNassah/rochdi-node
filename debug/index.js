@@ -10,6 +10,7 @@ const http2 = require('node:http2');
 // publish shorthand: 
 
 const {
+  awaitInternet,
   request,
   checkConnectivity,
   startTimer,
@@ -26,7 +27,7 @@ const input = 'foo';
 void async function () {
   const httpClient = new Http2Client({ retryOnError: true, userAgent: void 0 });
 
-  request('http://192.168.1.1', { method: 'GET' }).then(res => {
-    log(res);
-  })
+  awaitInternet().then(fetchIpAddress).then(ip => {
+    log(ip);
+  });
 }();

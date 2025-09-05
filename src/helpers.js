@@ -162,7 +162,7 @@ exports.request = function (urlString, opts = {}) {
 };
 
 exports.fetchIpAddress = async function () {
-  return exports.request({ method: 'GET', hostname: 'checkip.amazonaws.com', port: 443, path: '/' }).then(res => {
+  return exports.request('https://checkip.amazonaws.com').then(res => {
     const { statusCode, data } = res;
     if (200 !== statusCode) throw new Error('helpers.fetchIpAddress: request error, http('+statusCode+')');
     return data.trim();
@@ -184,12 +184,12 @@ exports.checkConnectivity = function () {
 };
 
 exports.awaitInternet = function (interval = 4e3) {
-  return new Promise(r => {
+  return new Promise(resolve => {
     const check = () => {
       exports.checkConnectivity().then(isOnline => {
         if (isOnline) {
           clearInterval(retryIntervalId);
-          r(true);
+          resolve(true);
         }
       });
     };
