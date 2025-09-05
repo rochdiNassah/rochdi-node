@@ -39,53 +39,71 @@ Http2Client.prototype.set = function (propertyName, value) {
   this[propertyName] = value;
 };
 
-Http2Client.prototype.destroy = function () {
+Http2Client.prototype.createSession = function (authority, cipher, key, keepalive) {
   const { sessions } = this;
-  for (const session of sessions.values())
-    session.destroy();
-  sessions.clear();
-};
 
-Http2Client.prototype.endSession = function (key) {
-  const { sessions } = this;
-  const session = sessions.get(key);
-  if (session) {
-    sessions.delete(key);
-    session.destroy();
-  }
-};
-
-Http2Client.prototype.createSessionAsync = function () {
-  return new Promise(resolve => {
-    const key = this.createSession(...arguments);
-    this.sessions.get(key).on('connect', resolve.bind(void 0, key));
-  });
-};
-
-Http2Client.prototype.createSession = function (authority, cipher, key) {
-  const { sessions } = this;
-  
-  if (cipher)
+  if (cipher) {
     tls.DEFAULT_CIPHERS = cipher;
+  }
 
   const session = http2.connect(authority).on('error', onsessionerror).on('close', onsessionclose).on('connect', onsessionconnect);
 
   tls.DEFAULT_CIPHERS = DEFAULT_CIPHERS;
-    
-  if (void 0 === key)
+
+  if (void 0 === key) {
     key = this.sessionCounter++;
+  }
 
   session.key = key;
-  session.cipher = cipher;
   session.authority = authority;
+  session.cipher = cipher;
+  session.keepalive = keepalive;
 
-  return sessions.set(key, session), log('session created(%s)', 'string' === typeof key ? 'auto' : 'manual'), key;
+  return sessions.set(key, session), log('session created(%s)', 'number' === typeof key ? 'manual' : 'global'), session;
+};
+
+Http2Client.prototype.createSessionAsync = function () {
+  return new Promise(resolve => {
+    this.createSession(...arguments).on('connect', function () {
+      resolve(this);
+    });
+  });
+};
+
+Http2Client.prototype.createSessions = function (endpoints) {
+  return endpoints.map(e => this.createSession(e.authority, e.cipher, e.authority, true));
+};
+
+Http2Client.prototype.createSessionsAsync = function (endpoints) {
+  return Promise.all(this.createSessions(endpoints).map(session => new Promise(resolve => session.on('connect', () => resolve(session)))));
+};
+
+Http2Client.prototype.ensureSession = function (session, cipher) {
+  if ('object' === typeof session) {
+    const { key, authority, cipher, keepalive, closed, destroyed } = session;
+    return closed || destroyed ? this.createSession(authority, cipher, key, keepalive) : session;
+  }
+
+  const authority = session;
+
+  session = this.sessions.get(authority);
+
+  if (
+    !session ||
+    session.cipher !== cipher ||
+    session.closed ||
+    session.destroyed
+  ) {
+    return this.createSession(authority, cipher, authority);
+  }
+
+  return session;
 };
 
 Http2Client.prototype._request = function (method, urlString, opts = {}) { 
   const { body, cipher } = opts;
   const { protocol, host, path } = urlParser(urlString);
-  const { sessions, userAgent } = this;
+  const { userAgent } = this;
 
   const headers = { ...opts.headers };
 
@@ -100,17 +118,19 @@ Http2Client.prototype._request = function (method, urlString, opts = {}) {
   }
 
   const authority = protocol+'//'+host;
-  const sessionKey = opts.sessionKey ?? authority;
   const options = { ':scheme': 'https', ':method': method, ':path': path, ...headers };
 
-  let rr, session = sessions.get(sessionKey);
-  if (!session || cipher !== session.cipher || session.destroyed || session.closed) {
-    session = sessions.get(this.createSession(authority, cipher, sessionKey));
-  }
+  const session = opts.session || this.ensureSession(authority, cipher);
 
+  let rr;
   const promise = new Promise((resolve, reject) => rr = { resolve, reject });
+
   const stream = session.request(options).on('error', onerror.bind(this, arguments, rr)).on('response', h => onresponse(h, stream, rr));
-  return body && stream.write('object' === typeof body ? JSON.stringify(body) : body), stream.end(), promise;
+
+  if (body)
+    stream.write('object' === typeof body ? JSON.stringify(body) : body);
+
+  return stream.end(), promise;
 };
 
 function onerror(args, promise, err) {
@@ -149,7 +169,10 @@ function onsessionclose() {
 }
 function onsessionconnect() {
   log('session connect ok(%s)', this.key);
-  this.pingIntervalId = setInterval(pingsession.bind(this), 59e3);
+  if (this.keepalive) {
+    log('keepalive ok');
+    this.pingIntervalId = setInterval(pingsession.bind(this), 59e3);
+  }
 }
 
 const pingBuffer = Buffer.from('pingpong');
